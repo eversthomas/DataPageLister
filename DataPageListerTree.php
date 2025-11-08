@@ -2,8 +2,8 @@
 
 /**
  * DataPageListerTree
- * - Versteckt Kinder im PageTree, sofern deren Parent ein Daten-Container unterhalb des Präfixes ist
- * - Bennent im PageTree die Aktion "Bearbeiten" -> "Tabelle" für Container-Seiten um
+ * - Versteckt Kinder im PageTree, sofern deren Parent ein Daten-Container ist
+ * - Benennt im PageTree die Aktion "Bearbeiten" -> "Tabelle" für Container-Seiten um
  */
 class DataPageListerTree extends Wire {
 
@@ -21,14 +21,15 @@ class DataPageListerTree extends Wire {
     $process = wire('process');
     if(!$process instanceof \ProcessWire\ProcessPageList) return;
 
-    if($mod->isDataContainer($parent) && $mod->isUnderPrefix($parent)) {
+    // Prüfen ob Parent ein Container ist (template-basiert)
+    if($mod->isDataContainer($parent)) {
       $event->return  = false;     // Kind nicht listbar
       $event->replace = true;      // finaler Return
     }
   }
 
   /**
-   * PageTree-Aktion "Bearbeiten" -> "Tabelle" bei Container-Eltern unterhalb des Präfixes
+   * PageTree-Aktion "Bearbeiten" -> "Tabelle" bei Container-Seiten
    */
   public static function hookPageListActionsRename(DataPageLister $mod, HookEvent $event) : void {
     /** @var Page $page */
@@ -36,7 +37,8 @@ class DataPageListerTree extends Wire {
     $actions = $event->return;
     if(!$page || !$page->id) return;
 
-    if(!$mod->isUnderPrefix($page) || !$mod->isDataContainer($page)) return;
+    // Prüfen ob dies ein Container ist (template-basiert)
+    if(!$mod->isDataContainer($page)) return;
 
     foreach($actions as &$a) {
       if(($a['name'] ?? '') === 'edit') {

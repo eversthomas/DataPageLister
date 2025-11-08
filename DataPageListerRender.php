@@ -4,19 +4,14 @@
  * DataPageListerRender
  *
  * Rendert die komplette Übersicht:
- *  - Inline Styles und JS (debounced Live-Filter)
+ *  - JavaScript für Live-Filter (debounced)
  *  - Header / Hilfe
  *  - Filterbar (ohne <form>, Navigation via JS)
  *  - "Neu anlegen"-Button
  *  - Tabelle mit Aktionen
  *  - Pager, der Filter-Querys beibehält
  *
- * Erwartete aktive Filter-Keys in $active:
- *   - q   : Suchbegriff (string)
- *   - by  : Feldname für Suche (string)
- *   - sort: Feldname für Sortierung (string)
- *   - dir : Richtung 'asc'|'desc'
- *   - pg  : Seitenzahl (int), optional
+ * Styles sind jetzt in DataPageLister.css
  */
 class DataPageListerRender {
 
@@ -41,7 +36,7 @@ class DataPageListerRender {
     // Basis: Admin-Edit-URL der Elternseite (hier soll gefiltert/paginiert werden)
     $editBase = rtrim($adminUrl, '/') . "/page/edit/?id=" . (int) $parent->id;
 
-    $out  = self::styles();
+    $out  = self::renderJavaScript();
     $out .= self::renderHeader($parent, $childTemplates, $total);
     if ($showHelp) {
       $out .= self::renderHelp($childTemplates, $fieldNames);
@@ -55,30 +50,10 @@ class DataPageListerRender {
   }
 
   /**
-   * Inline CSS + JS (debounced Live-Filter)
+   * JavaScript (debounced Live-Filter)
    */
-  public static function styles() : string {
-    return <<<HTML
-<style>
-.dpo-wrap { background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px; }
-.dpo-meta { margin:0 0 8px; font-size:.95rem; }
-.dpo-help { background:#fff3cd; border:1px solid #ffeeba; padding:10px; border-radius:6px; margin:8px 0 12px; }
-.dpo-filters { display:flex; gap:8px; flex-wrap:wrap; padding:8px; background:#fff; border:1px solid #e5e5e5; border-radius:6px; margin-bottom:12px; align-items:center; }
-.dpo-filters input[type="text"] { padding:6px; min-width:220px; }
-.dpo-filters label { opacity:.8; }
-.dpo-table { width:100%; border-collapse:collapse; }
-.dpo-table th, .dpo-table td { border-bottom:1px solid #e5e5e5; padding:8px; vertical-align:top; }
-.dpo-table thead th { background:#fafafa; }
-.dpo-actions a { margin-right:6px; }
-.dpo-pager { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
-.dpo-pager a, .dpo-pager span { padding:6px 9px; border:1px solid #ddd; border-radius:4px; text-decoration:none; }
-.dpo-pager .active { background:#e9ecef; }
-/* Zusätzliche Submit-Buttons im ProcessPageEdit-Footer für diese Ansicht ausblenden */
-ul.pw-button-dropdown {
-    display: none;
-}
-}
-</style>
+  public static function renderJavaScript() : string {
+    return <<<'HTML'
 <script>
 (function(){
   function debounce(fn, wait){ let t; return function(){ clearTimeout(t); const a=arguments, c=this; t=setTimeout(function(){ fn.apply(c,a); }, wait); }; }
@@ -97,7 +72,7 @@ ul.pw-button-dropdown {
   function parseQuery(search){
     const out={};
     if(!search) return out;
-    search.replace(/^\\?/,'').split('&').forEach(function(kv){
+    search.replace(/^\?/,'').split('&').forEach(function(kv){
       if(!kv) return;
       const i = kv.indexOf('=');
       if(i===-1){ out[decodeURIComponent(kv)]=''; return; }
@@ -113,7 +88,6 @@ ul.pw-button-dropdown {
     if(!bar) return;
 
     var baseUrl = bar.getAttribute('data-base-url') || window.location.pathname;
-    var keep    = JSON.parse(bar.getAttribute('data-keep') || '{}');
 
     var inputQ  = bar.querySelector('input[name="q"]');
     var selBy   = bar.querySelector('select[name="by"]');
@@ -160,7 +134,6 @@ ul.pw-button-dropdown {
     if(btnReset){
       btnReset.addEventListener('click', function(e){
         e.preventDefault();
-        // Nur zur Base-URL (inkl. ?id=...)
         window.location = baseUrl;
       });
     }
@@ -176,27 +149,34 @@ HTML;
   public static function renderHeader(Page $parent, array $childTemplates, int $total) : string {
     $tplNames = implode(', ', array_map(function($tpl){ return $tpl->name; }, $childTemplates));
     $parentTitle = htmlspecialchars((string) $parent->title, ENT_QUOTES, 'UTF-8');
-    return "<div class='dpo-wrap dpo-meta'><strong>{$parentTitle}</strong> – {$total} Einträge | Kind-Templates: {$tplNames}</div>";
+    
+    return "<div class='dpo-wrap dpo-meta'>
+      <strong>{$parentTitle}</strong>
+      <span class='dpo-meta-divider'>•</span>
+      <span>{$total} " . (($total === 1) ? 'Eintrag' : 'Einträge') . "</span>
+      <span class='dpo-meta-divider'>•</span>
+      <span>Templates: {$tplNames}</span>
+    </div>";
   }
 
   /**
    * Hilfe-Hinweis
    */
   public static function renderHelp(array $childTemplates, array $fieldNames) : string {
-    $fieldsList = $fieldNames ? implode(', ', array_map('htmlspecialchars', $fieldNames)) : '–';
+    $fieldsList = $fieldNames ? implode(', ', array_map('htmlspecialchars', $fieldNames)) : '—';
     $tpls = $childTemplates
       ? implode(', ', array_map(function($tpl){ return "<code>" . htmlspecialchars($tpl->name, ENT_QUOTES, 'UTF-8') . "</code>"; }, $childTemplates))
       : '—';
     return "<div class='dpo-help'>
-      <strong>Hinweis:</strong> Diese Übersicht zeigt den Titel sowie die definierten Felder der Kinder.<br>
-      Templates: {$tpls}<br>
-      Felder: {$fieldsList}
+      <strong>💡 Hinweis</strong>
+      Diese Übersicht zeigt den Titel sowie die definierten Felder der Kinder.<br>
+      <strong>Templates:</strong> {$tpls}<br>
+      <strong>Angezeigte Felder:</strong> {$fieldsList}
     </div>";
   }
 
   /**
    * Filterbar (JS-gesteuert, kein <form>)
-   * $baseUrl muss die Admin-Edit-URL der Elternseite sein (inkl. ?id=)
    */
   public static function renderFilterBar(array $active, array $allowedFields, string $baseUrl) : string {
     $san = wire('sanitizer');
@@ -206,7 +186,6 @@ HTML;
     $sort = $san->entities($active['sort'] ?? (wire('input')->get('sort') ?? 'title'));
     $dir  = $san->entities($active['dir']  ?? (wire('input')->get('dir')  ?? 'asc'));
 
-    // Optionen-Renderer
     $renderOpts = function($current) use ($allowedFields) {
       $out = '';
       foreach ($allowedFields as $f) {
@@ -219,41 +198,33 @@ HTML;
 
     $byOptions   = $renderOpts($by);
     $sortOptions = $renderOpts($sort);
-
-    $keep = [
-      'q'    => $active['q']   ?? '',
-      'by'   => $by,
-      'sort' => $sort,
-      'dir'  => $dir,
-    ];
-    $keepJson = htmlspecialchars(json_encode($keep), ENT_QUOTES, 'UTF-8');
     $baseEsc  = htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8');
 
-    return "<div class='dpo-filters' data-base-url='{$baseEsc}' data-keep='{$keepJson}'>
+    return "<div class='dpo-filters' data-base-url='{$baseEsc}'>
       <input type='text' name='q' value='{$q}' placeholder='Suche...'>
-      <label>Feld</label>
+      <label>Feld:</label>
       <select name='by'>{$byOptions}</select>
-      <label>Sortieren nach</label>
+      <label>Sortieren:</label>
       <select name='sort'>{$sortOptions}</select>
       <select name='dir'>
-        <option value='asc'  ".($dir==='asc'?'selected':'').">asc</option>
-        <option value='desc' ".($dir==='desc'?'selected':'').">desc</option>
+        <option value='asc'  ".($dir==='asc'?'selected':'').">aufsteigend</option>
+        <option value='desc' ".($dir==='desc'?'selected':'').">absteigend</option>
       </select>
-      <button class='ui-button ui-state-default' type='button' data-apply>Anwenden</button>
-      <a class='ui-button ui-state-default' href='{$baseEsc}' data-reset>Zurücksetzen</a>
+      <button type='button' data-apply>Anwenden</button>
+      <a href='#' data-reset>Zurücksetzen</a>
     </div>";
   }
 
   /**
-   * Button "Neu anlegen" (nimmt erstes Kind-Template als Default)
+   * Button "Neu anlegen"
    */
   public static function renderAddButton(Page $parent, array $childTemplates, string $adminUrl) : string {
     if (!count($childTemplates)) return '';
     $tpl = $childTemplates[0];
     $addUrl = rtrim($adminUrl, '/') . "/page/add/?parent_id=" . (int) $parent->id . "&template_id=" . (int) $tpl->id;
     $addUrl = htmlspecialchars($addUrl, ENT_QUOTES, 'UTF-8');
-    return "<div style='margin:8px 0 12px;'>
-      <a href='{$addUrl}' class='ui-button ui-state-default pw-panel'><i class='fa fa-plus'></i> Neu anlegen</a>
+    return "<div class='dpo-add-button'>
+      <a href='{$addUrl}' class='pw-panel'><i class='fa fa-plus'></i> Neu anlegen</a>
     </div>";
   }
 
@@ -262,13 +233,24 @@ HTML;
    */
   public static function renderTable(array $fieldNames, PageArray $items, bool $showViewButton) : string {
     // Header
-    $ths = "<th>Title</th>";
+    $ths = "<th>Titel</th>";
     foreach ($fieldNames as $f) {
       $ths .= "<th>" . htmlspecialchars((string) $f, ENT_QUOTES, 'UTF-8') . "</th>";
     }
-    $ths .= "<th style='width:180px;'>Aktionen</th>";
+    $ths .= "<th>Aktionen</th>";
 
     $adminUrl = wire('config')->urls->admin;
+
+    // Wenn keine Items, zeige Empty State
+    if(!count($items)) {
+      return "<div class='dpo-table-wrapper'>
+        <div class='dpo-empty'>
+          <div class='dpo-empty-icon'>📋</div>
+          <div class='dpo-empty-text'>Keine Einträge gefunden</div>
+          <div class='dpo-empty-hint'>Versuche die Filter anzupassen oder erstelle einen neuen Eintrag.</div>
+        </div>
+      </div>";
+    }
 
     $rows = '';
     foreach ($items as $p) {
@@ -289,28 +271,35 @@ HTML;
           $val = implode(', ', $val);
         }
 
-        $dataCells .= "<td>" . htmlspecialchars((string)$val, ENT_QUOTES, 'UTF-8') . "</td>";
+        // Wert kürzen falls zu lang
+        $displayVal = (string)$val;
+        if(strlen($displayVal) > 100) {
+          $displayVal = substr($displayVal, 0, 97) . '...';
+        }
+
+        $dataCells .= "<td>" . htmlspecialchars($displayVal, ENT_QUOTES, 'UTF-8') . "</td>";
       }
 
       // Aktionen
       $actions = [];
-      $actions[] = "<a href='" . htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') . "' class='ui-button ui-state-default'>Bearbeiten</a>";
+      $actions[] = "<a href='" . htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') . "'>Bearbeiten</a>";
       if ($showViewButton) {
-        $actions[] = "<a target='_blank' href='" . htmlspecialchars($p->url, ENT_QUOTES, 'UTF-8') . "' class='ui-button ui-state-default'>Ansehen</a>";
+        $actions[] = "<a target='_blank' href='" . htmlspecialchars($p->url, ENT_QUOTES, 'UTF-8') . "'>Ansehen</a>";
       }
 
-      $rows .= "<tr>{$titleCell}{$dataCells}<td class='dpo-actions'>" . implode(' ', $actions) . "</td></tr>";
+      $rows .= "<tr>{$titleCell}{$dataCells}<td class='dpo-actions'>" . implode('', $actions) . "</td></tr>";
     }
 
-    return "<table class='dpo-table'>
-      <thead><tr>{$ths}</tr></thead>
-      <tbody>{$rows}</tbody>
-    </table>";
+    return "<div class='dpo-table-wrapper'>
+      <table class='dpo-table'>
+        <thead><tr>{$ths}</tr></thead>
+        <tbody>{$rows}</tbody>
+      </table>
+    </div>";
   }
 
   /**
-   * Pager, der die aktiven Filter beibehält.
-   * $baseUrl ist die Admin-Edit-URL der Elternseite inkl. ?id=...
+   * Pager, der die aktiven Filter beibehält
    */
   public static function renderPager(int $pageNum, int $limit, int $total, string $baseUrl, array $active) : string {
     if ($total <= $limit) return '';
@@ -332,8 +321,27 @@ HTML;
     };
 
     $out = "<div class='dpo-pager'>";
-    for ($i = 1; $i <= $pages; $i++) {
-      if ($i === $pageNum) {
+    
+    // Intelligente Pagination (zeige nicht alle Seiten bei vielen Pages)
+    $showPages = [];
+    if($pages <= 7) {
+      // Wenige Seiten: zeige alle
+      for($i = 1; $i <= $pages; $i++) $showPages[] = $i;
+    } else {
+      // Viele Seiten: zeige erste, letzte und um aktuelle herum
+      $showPages[] = 1;
+      if($pageNum > 3) $showPages[] = '...';
+      for($i = max(2, $pageNum - 1); $i <= min($pages - 1, $pageNum + 1); $i++) {
+        $showPages[] = $i;
+      }
+      if($pageNum < $pages - 2) $showPages[] = '...';
+      $showPages[] = $pages;
+    }
+
+    foreach($showPages as $i) {
+      if($i === '...') {
+        $out .= "<span>…</span>";
+      } elseif ($i === $pageNum) {
         $out .= "<span class='active'>{$i}</span>";
       } else {
         $out .= "<a href='" . htmlspecialchars($makeUrl($i), ENT_QUOTES, 'UTF-8') . "'>{$i}</a>";
